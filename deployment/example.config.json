@@ -1,0 +1,12 @@
+
+{
+    "localProjectPath": "../ YOUR PROJECT PATH",
+    "zipFileName": "deploy.zip",
+    "remoteZipPath": "/home/ubuntu/uploads/deploy.zip",
+    "remoteDeployDir": "/home/ubuntu/uploads/your_app_name",
+    "ssh": {
+        "host": "YOUR CLOUD HOST URL OR IPV4 ADDRESS", 
+        "username": "ubuntu",
+        "privateKey": "YOUR AWS INSTANCE .pem KEY FILE"
+    }
+}
