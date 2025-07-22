@@ -4,9 +4,10 @@ import { PrismaModule } from './prisma/prisma.module';
 import { APP_FILTER } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/allException.filter';
 import { UsersModule } from './users/users.module';
+import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
-  imports: [AuthModule, PrismaModule, UsersModule],
+  imports: [AuthModule, PrismaModule, UsersModule, GatewayModule],
   controllers: [],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
