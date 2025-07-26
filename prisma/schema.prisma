@@ -5,50 +5,135 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+    provider      = "prisma-client-js"
+    output        = "../generated/prisma"
+    binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String            @id @default(cuid())
-  username  String            @unique
-  email     String            @unique
-  password  String
-  chats     ChatParticipant[]
-  messages  Message[]
-  createdAt DateTime          @default(now())
+    id        String            @id @default(cuid())
+    username  String            @unique
+    email     String            @unique
+    password  String
+    chats     ChatParticipant[]
+    messages  Message[]
+    createdAt DateTime          @default(now())
+
+    Server Server[] 
+
+    GroupDetails GroupDetails[]
 }
 
+// Unified Chat model with type discrimination
 model Chat {
-  id           String            @id @default(cuid())
-  name         String?
-  isGroup      Boolean           @default(false)
-  messages     Message[]
-  participants ChatParticipant[]
-  createdAt    DateTime          @default(now())
+    id           String            @id @default(cuid())
+    name         String? // Only for groups/channels
+    type         ChatType          @default(GROUP) // Add this enum field
+    messages     Message[]
+    participants ChatParticipant[]
+    createdAt    DateTime          @default(now())
+
+    groupDetails GroupDetails?
+
+    channelData ChannelData?
+    @@index([id])
+}
+
+
+
+model GroupDetails {
+    id          String   @id @default(cuid())
+    chat        Chat     @relation(fields: [chatId], references: [id])
+    chatId      String   @unique // One-to-one relationship
+    createdBy   User     @relation(fields: [createdById], references: [id])
+    createdById String
+    avatarUrl   String?
+    description String?
+    updatedAt   DateTime @updatedAt
+}
+
+// Additional model for channel-specific data
+model ChannelData {
+    id          String  @id @default(cuid()) 
+    chat        Chat    @relation(fields: [chatId], references: [id])
+    chatId      String  @unique
+    server      Server  @relation(fields: [serverId], references: [id])
+    serverId    String
+    isPrivate   Boolean @default(false)
+    description String?
+    position    Int? // For ordering in UI
+}
+
+model Server {
+    id        String        @id @default(cuid())
+    name      String
+    owner     User          @relation(fields: [ownerId], references: [id])
+    ownerId   String
+    channels  ChannelData[]
+    createdAt DateTime      @default(now())
 }
 
 model ChatParticipant {
-  id       String   @id @default(cuid())
-  chat     Chat     @relation(fields: [chatId], references: [id])
-  chatId   String
-  user     User     @relation(fields: [userId], references: [id])
-  userId   String
-  joinedAt DateTime @default(now())
+    id     String @id @default(cuid())
+    chat   Chat   @relation(fields: [chatId], references: [id])
+    chatId String
+    user   User   @relation(fields: [userId], references: [id])
+    userId String
+
+    // For channels: additional permissions/roles
+    role ParticipantRole? @default(MEMBER)
+
+    joinedAt DateTime @default(now())
+
+    @@index([chatId, userId])
+    @@unique([chatId, userId])
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  content   String
-  sender    User     @relation(fields: [senderId], references: [id])
-  senderId  String
-  chat      Chat     @relation(fields: [chatId], references: [id])
-  chatId    String
-  createdAt DateTime @default(now())
+    id        String   @id @default(cuid())
+    content   String
+    sender    User     @relation(fields: [senderId], references: [id])
+    senderId  String
+    chat      Chat     @relation(fields: [chatId], references: [id])
+    chatId    String
+    createdAt DateTime @default(now())
+
+    // For rich message features
+    editedAt    DateTime?
+    deletedAt   DateTime?
+    attachments Attachment[]
+}
+
+model Attachment {
+    id        String         @id @default(cuid())
+    url       String
+    type      AttachmentType
+    message   Message        @relation(fields: [messageId], references: [id])
+    messageId String
+    createdAt DateTime       @default(now())
+}
+
+// Enums for type discrimination
+enum ChatType {
+    DM // 1:1 direct message
+    GROUP // Small group chat
+    CHANNEL // Server channel
+}
+
+enum ParticipantRole {
+    MEMBER
+    MODERATOR
+    ADMIN
+}
+
+enum AttachmentType {
+    IMAGE
+    VIDEO
+    AUDIO
+    FILE
 }

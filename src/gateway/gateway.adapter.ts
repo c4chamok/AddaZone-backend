@@ -11,9 +11,8 @@ export class AuthIoAdapter extends IoAdapter {
     super(app);
   }
 
-  createIOServer(port: number, options?: any): any {
+  createIOServer(port: number, options?: object): any {
     const server = super.createIOServer(port, options) as Server;
-
     const jwtService = this.app.get(JwtService);
 
     server.use((socket: AuthenticatedSocket, next) => {
