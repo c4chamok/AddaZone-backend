@@ -84,7 +84,6 @@ export class EventService {
             participant.userId !== userId &&
             userSocketMap.has(participant.userId)
           ) {
-            console.log(participant);
             userSocketMap.get(participant.userId)?.emit('online-friends', {
               onlineConvoIds: [participant.chatId],
             });
