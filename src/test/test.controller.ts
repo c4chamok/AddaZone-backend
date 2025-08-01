@@ -25,4 +25,13 @@ export class TestController {
       cookie: 'test-cookie-value',
     };
   }
+  @Get('list-chats')
+  listChats() {
+    return this.dbClient.chat.findMany({
+      include: {
+        participants: true,
+        messages: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+  }
 }

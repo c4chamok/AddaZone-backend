@@ -2,19 +2,22 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
+  Param,
   Post,
-  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { AuthenticatedRequest } from 'src/auth/auth.interface';
+import { userSocketMap } from 'src/gateway/socketMapper';
 // import { userSocketMap } from 'src/gateway/socketMapper';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { chatMap } from 'src/utils/Maps/chatMap';
+import { userChatIdsMap } from 'src/utils/Maps/userChatIdsMap';
 
 @Controller('api/chat')
 export class ChatController {
@@ -90,23 +93,30 @@ export class ChatController {
     });
 
     chatMap.set(chatInstance.id, chatInstance);
+    const userChatIds = userChatIdsMap.get(req.user.uid);
+    userChatIds?.push(chatInstance.id);
+    userChatIdsMap.set(req.user.uid, userChatIds || [chatInstance.id]);
+
+    const convo = userSocketMap.has(dto.toUserId)
+      ? { ...chatInstance, status: 'online' }
+      : { ...chatInstance, status: 'offline' };
 
     return {
       success: true,
       message: 'chat initiated',
-      chatInstance,
+      chatInstance: convo,
     };
   }
 
-  @Get('')
+  @Get(':chatId')
   @UseGuards(AuthGuard)
   async findChatById(
-    @Query() query: { chatId: string },
+    @Param('chatId') chatId: string,
     @Request() req: AuthenticatedRequest,
   ) {
     const chatInstance = await this.dbClient.chat.findFirst({
       where: {
-        id: query.chatId,
+        id: chatId,
         participants: {
           some: { userId: req.user.uid }, // Verify user has access
         },
@@ -124,8 +134,60 @@ export class ChatController {
 
     return {
       success: true,
-      message: 'chat initiated',
+      message: 'chat found',
       chatInstance,
+    };
+  }
+
+  @Get('')
+  @UseGuards(AuthGuard)
+  async listChats(@Request() req: AuthenticatedRequest) {
+    const conversations = await this.dbClient.chat.findMany({
+      where: {
+        participants: {
+          some: { userId: req.user.uid }, // Verify user has access
+        },
+        messages: { some: { id: { not: undefined } } }, // Ensure there are messages in the chat
+      },
+      include: {
+        participants: {
+          where: { userId: { not: req.user.uid } },
+          include: {
+            user: { select: { username: true, email: true, id: true } },
+          },
+        },
+        messages: { take: 30, orderBy: { createdAt: 'asc' } }, // Fetch last 10 messages
+      },
+    });
+
+    return {
+      success: true,
+      message: 'chat list retrieved',
+      conversations,
+    };
+  }
+  @Delete('cascade')
+  async cahtAlldelete() {
+    await this.dbClient.message.deleteMany({
+      where: { chat: { type: 'DM' } },
+    });
+    await this.dbClient.chatParticipant.deleteMany({
+      where: { chat: { type: 'DM' } },
+    });
+    await this.dbClient.chat.deleteMany({
+      where: {
+        type: 'DM',
+      },
+    });
+    chatMap.clear();
+    userChatIdsMap.clear();
+    userSocketMap.clear();
+    console.log('All DM chats deleted');
+
+    return {
+      success: true,
+      message: 'chat list deleted',
+      data: await this.dbClient.chat.findMany(),
     };
   }
 }

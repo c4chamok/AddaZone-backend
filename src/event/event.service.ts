@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { userSocketMap } from 'src/gateway/socketMapper';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { chatMap } from 'src/utils/Maps/chatMap';
+import { userChatIdsMap } from 'src/utils/Maps/userChatIdsMap';
 
 @Injectable()
 export class EventService {
@@ -31,11 +32,19 @@ export class EventService {
       const newMessage = await this.saveMessage(message, userId, chatId);
       chatInstance.messages.push(newMessage);
       chatMap.set(chatId, chatInstance);
+      userSocketMap.get(toUserId)?.emit('online-friends', {
+        onlineConvoIds: [chatId],
+      });
+      userSocketMap.get(userId)?.emit('online-friends', {
+        onlineConvoIds: [chatId],
+      });
     }
     // Notify the recipient via socket
     receiverSocket?.emit('message-receive', {
       chatId: chatId,
       content: message,
+      senderId: userId,
+      timestamp: new Date(),
     });
   }
 
@@ -46,17 +55,6 @@ export class EventService {
         senderId: userId,
         chatId: chatId,
       },
-      // include: {
-      //   sender: { select: { id: true, username: true } },
-      //   chat: {
-      //     include: {
-      //       participants: {
-      //         where: { userId: toUserId },
-      //         select: { userId: true },
-      //       },
-      //     },
-      //   },
-      // },
     });
     return newMessage;
   }
@@ -70,11 +68,34 @@ export class EventService {
         messages: { take: 1, orderBy: { createdAt: 'desc' } },
       },
     });
+
     console.log(JSON.stringify(chats).length);
+    const onlineConvoIds = new Set<string>();
+    const chatIds: string[] = [];
     chats.forEach((chat) => {
       if (chat.participants.length > 0) {
+        chatIds.push(chat.id);
         chatMap.set(chat.id, chat);
+
+        if (chat.messages.length === 0) return;
+        // Check for online participants
+        chat.participants.forEach((participant) => {
+          if (
+            participant.userId !== userId &&
+            userSocketMap.has(participant.userId)
+          ) {
+            console.log(participant);
+            userSocketMap.get(participant.userId)?.emit('online-friends', {
+              onlineConvoIds: [participant.chatId],
+            });
+            onlineConvoIds.add(participant.chatId);
+          }
+        });
       }
     });
+    userSocketMap.get(userId)?.emit('online-friends', {
+      onlineConvoIds: Array.from(onlineConvoIds),
+    });
+    userChatIdsMap.set(userId, chatIds);
   }
 }
