@@ -17,6 +17,15 @@ export class TestController {
     return { message: 'Test endpoint is working!', chat };
   }
 
+  @Get('ping')
+  async ping() {
+    const isConnected = await this.dbClient.$queryRaw`SELECT 1`; // Check if the database connection is alive
+    if (!isConnected) {
+      throw new Error('Database connection failed');
+    }
+    return { success: true, message: 'pong' };
+  }
+
   @Get('cookie-test')
   cookieTest(@Req() req: Request) {
     console.log(req.cookies);
