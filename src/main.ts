@@ -12,7 +12,7 @@ async function bootstrap() {
       'http://localhost:5173/',
       'http://192.168.0.113:5173',
       'http://192.168.0.113:5173/',
-    ],
+    ].push(process.env.FRONTEND_URL ?? ''),
     credentials: true,
   });
   app.use(cookieParser());
