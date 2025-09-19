@@ -1,35 +1,38 @@
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { UnauthorizedException } from '@nestjs/common';
+import {
+  INestApplicationContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as cookie from 'cookie';
 import { AuthenticatedSocket } from 'src/utils/interfaces';
 import { Server } from 'socket.io';
 import { CustomConfigService } from 'src/config/config.service';
 
+@Injectable()
 export class AuthIoAdapter extends IoAdapter {
-  constructor(
-    private jwtService: JwtService,
-    private readonly config: CustomConfigService,
-  ) {
-    super();
+  constructor(private readonly app: INestApplicationContext) {
+    super(app);
   }
 
   createIOServer(port: number, options?: object): any {
     const server = super.createIOServer(port, options) as Server;
+    const jwtService = this.app.get(JwtService);
+    const config = this.app.get(CustomConfigService);
 
     server.use((socket: AuthenticatedSocket, next) => {
       try {
         // Get token from header or auth payload
-        console.log(socket.handshake);
         const rawToken = this.getTokenFromCookie(
           socket.handshake.headers.cookie,
         );
 
         if (!rawToken) throw new UnauthorizedException('Token not found');
 
-        const payload: { uid: string; email: string } = this.jwtService.verify(
+        const payload: { uid: string; email: string } = jwtService.verify(
           rawToken,
-          { secret: this.config.getJWTSecret() },
+          { secret: config.getJWTSecret() },
         );
 
         socket.user = payload; // store user for later use

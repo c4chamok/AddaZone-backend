@@ -9,12 +9,13 @@ import { ChatModule } from './chat/chat.module';
 import { TestModule } from './test/test.module';
 import { EventModule } from './event/event.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { AuthIoAdapter } from './gateway/gateway.adapter';
 import { CustomConfigModule } from './config/config.module';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 
 @Module({
   imports: [
     AuthModule,
+    JwtModule.register({ global: true }),
     PrismaModule,
     UsersModule,
     GatewayModule,
@@ -27,8 +28,8 @@ import { CustomConfigModule } from './config/config.module';
   controllers: [],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
-    AuthIoAdapter,
+    JwtService,
   ],
-  exports: [],
+  exports: [JwtModule],
 })
 export class AppModule {}
