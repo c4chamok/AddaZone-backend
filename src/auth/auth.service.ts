@@ -1,17 +1,16 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthDto, RegisterDto } from './DTO/auth.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { JWT_SECRET } from 'src/config/env';
 import { UsersService } from 'src/users/users.service';
+import { CustomConfigService } from 'src/config/config.service';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private dbClient: PrismaService,
     private userService: UsersService,
     private jwtService: JwtService,
+    private config: CustomConfigService,
   ) {}
 
   async signUp(dto: RegisterDto) {
@@ -38,7 +37,7 @@ export class AuthService {
 
     const accessToken = await this.jwtService.signAsync(
       { uid: theUser.id, email: theUser.email },
-      { secret: JWT_SECRET, expiresIn: '1h' },
+      { secret: this.config.getJWTSecret(), expiresIn: '1h' },
     );
 
     return {

@@ -9,6 +9,8 @@ import { ChatModule } from './chat/chat.module';
 import { TestModule } from './test/test.module';
 import { EventModule } from './event/event.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { AuthIoAdapter } from './gateway/gateway.adapter';
+import { CustomConfigModule } from './config/config.module';
 
 @Module({
   imports: [
@@ -20,8 +22,13 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     TestModule,
     EventModule,
     EventEmitterModule.forRoot(),
+    CustomConfigModule,
   ],
   controllers: [],
-  providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
+  providers: [
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    AuthIoAdapter,
+  ],
+  exports: [],
 })
 export class AppModule {}

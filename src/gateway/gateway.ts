@@ -21,6 +21,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
 
   handleConnection(socket: AuthenticatedSocket) {
+    console.log('connecting');
     userSocketMap.set(socket.user.uid, socket);
     this.event.emit('socket.connected', socket.user.uid);
     console.log(
