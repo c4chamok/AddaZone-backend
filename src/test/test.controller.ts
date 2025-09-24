@@ -1,6 +1,8 @@
 import { Controller, Get, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
+import { userSocketMap } from 'src/gateway/socketMapper';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { chatMap, IChatInstance } from 'src/utils/Maps/chatMap';
 
 @Controller('api/test')
 export class TestController {
@@ -42,5 +44,17 @@ export class TestController {
         messages: { orderBy: { createdAt: 'desc' } },
       },
     });
+  }
+  @Get('list-maps')
+  listMaps() {
+    const usersockets: { socketid: string; userId: string }[] = [];
+    const chats: IChatInstance[] = [];
+    chatMap.forEach((value) => {
+      return chats.push(value);
+    });
+    userSocketMap.forEach((value, key) => {
+      return usersockets.push({ socketid: value.id, userId: key });
+    });
+    return { usersockets, chats };
   }
 }

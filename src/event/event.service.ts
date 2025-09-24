@@ -28,16 +28,18 @@ export class EventService {
     if (chatInstance?.messages.length > 0) {
       void this.saveMessage(message, userId, chatId);
     } else {
-      // console.log(object);
+      // For messaging the first message in a chat
       const newMessage = await this.saveMessage(message, userId, chatId);
       chatInstance.messages.push(newMessage);
       chatMap.set(chatId, chatInstance);
-      userSocketMap.get(toUserId)?.emit('online-friends', {
-        onlineConvoIds: [chatId],
-      });
-      userSocketMap.get(userId)?.emit('online-friends', {
-        onlineConvoIds: [chatId],
-      });
+      if (receiverSocket) {
+        receiverSocket.emit('online-friends', {
+          onlineConvoIds: [chatId],
+        });
+        userSocketMap.get(userId)?.emit('online-friends', {
+          onlineConvoIds: [chatId],
+        });
+      }
     }
     // Notify the recipient via socket
     receiverSocket?.emit('message-receive', {

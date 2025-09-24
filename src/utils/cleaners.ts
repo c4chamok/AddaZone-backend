@@ -2,38 +2,54 @@ import { userSocketMap } from 'src/gateway/socketMapper';
 import { chatMap } from './Maps/chatMap';
 import { userChatIdsMap } from './Maps/userChatIdsMap';
 
-export const userChatMemCleaner = async (userId: string) => {
-  userSocketMap.delete(userId);
-  const userChatIds = userChatIdsMap.get(userId);
+const userCleanupTimers = new Map<string, NodeJS.Timeout>();
 
-  const isExist = await new Promise((resolve) => {
-    setTimeout(() => {
-      if (userSocketMap.has(userId)) {
-        console.log(`User ${userId} still has an active socket connection.`);
-        return resolve(true);
-      }
-      return resolve(false);
-    }, 2000);
-  });
-  if (isExist) return;
+export const userChatMemCleaner = (userId: string) => {
+  // Clear any existing cleanup timer for this user
+  if (userCleanupTimers.has(userId)) {
+    const timer = userCleanupTimers.get(userId);
+    if (timer) clearTimeout(timer);
+  }
 
-  console.log(`Cleaning up memory for user ${userId}`);
-  userChatIds?.forEach((chatId) => {
-    const chatInstance = chatMap.get(chatId);
-    // If the chat instance exists and has no participants, we can safely delete it from the chatMap
-    // This ensures that we don't delete chats that still have active participants
-    // This is a simple cleanup to avoid memory leaks and to ensure that we don't keep empty chat instances in memory.
-    if (chatInstance) {
+  // Schedule cleanup in 2s (debounced)
+  const timer = setTimeout(() => {
+    // If the user reconnected, skip cleanup
+    if (userSocketMap.has(userId)) {
+      console.log(`User ${userId} is still online, skipping cleanup.`);
+      return;
+    }
+
+    console.log(`Cleaning up memory for user ${userId}`);
+    const userChatIds = userChatIdsMap.get(userId);
+
+    userChatIds?.forEach((chatId) => {
+      const chatInstance = chatMap.get(chatId);
+      if (!chatInstance) return;
+
+      // Notify online participants
       chatInstance.participants.forEach((participant) => {
-        if (participant.userId !== userId) {
+        if (
+          participant.userId !== userId &&
+          userSocketMap.has(participant.userId)
+        ) {
           userSocketMap.get(participant.userId)?.emit('offline-friends', {
             onlineConvoIds: [participant.chatId],
           });
         }
-        if (!userSocketMap.has(participant.userId)) {
-          chatMap.delete(chatId);
-        }
       });
-    }
-  });
+
+      // Delete chat only if *all* participants are offline
+      const allOffline = chatInstance.participants.every(
+        (p) => !userSocketMap.has(p.userId),
+      );
+      if (allOffline) {
+        chatMap.delete(chatId);
+      }
+    });
+
+    // Clean up memory
+    userCleanupTimers.delete(userId);
+  }, 2000);
+
+  userCleanupTimers.set(userId, timer);
 };

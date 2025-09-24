@@ -74,6 +74,23 @@ export class ChatController {
     @Body() dto: { toUserId: string },
     @Request() req: AuthenticatedRequest,
   ) {
+    const existingChat = await this.dbClient.chat.findFirst({
+      where: {
+        type: 'DM',
+        participants: {
+          some: {
+            userId: { in: [dto.toUserId, req.user.uid] },
+          },
+        },
+      },
+    });
+    if (existingChat) {
+      return {
+        success: true,
+        message: 'chat exist',
+        chatInstance: existingChat,
+      };
+    }
     const chatInstance = await this.dbClient.chat.create({
       data: {
         type: 'DM',
@@ -83,7 +100,6 @@ export class ChatController {
       },
       include: {
         participants: {
-          where: { userId: { not: req.user.uid } },
           include: {
             user: { select: { username: true, email: true, id: true } },
           },
@@ -123,7 +139,6 @@ export class ChatController {
       },
       include: {
         participants: {
-          where: { userId: { not: req.user.uid } },
           include: {
             user: { select: { username: true, email: true, id: true } },
           },
@@ -151,7 +166,6 @@ export class ChatController {
       },
       include: {
         participants: {
-          where: { userId: { not: req.user.uid } },
           include: {
             user: { select: { username: true, email: true, id: true } },
           },
