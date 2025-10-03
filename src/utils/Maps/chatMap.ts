@@ -26,5 +26,5 @@ export interface IChatInstance {
   participants: IChatParticipants[];
   messages: IMessages[];
 }
-// 
+
 export const chatMap = new Map<string, IChatInstance>();

@@ -18,6 +18,8 @@ import { userSocketMap } from 'src/gateway/socketMapper';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { chatMap } from 'src/utils/Maps/chatMap';
 import { userChatIdsMap } from 'src/utils/Maps/userChatIdsMap';
+import { enqueue } from 'src/utils/taskQueuer';
+import { v4 as uuidV4 } from 'uuid';
 
 @Controller('api/chat')
 export class ChatController {
@@ -53,9 +55,11 @@ export class ChatController {
       throw new ForbiddenException('You do not have access to this chat');
     }
     // 3. Notify recipient
+    const msgId = uuidV4();
 
     this.event.emit(
       'message.create',
+      msgId,
       dto.message,
       req.user.uid,
       dto.chatId,
@@ -65,6 +69,7 @@ export class ChatController {
     return {
       success: true,
       message: 'Message sent successfully',
+      msgId,
     };
   }
 
@@ -124,6 +129,27 @@ export class ChatController {
     };
   }
 
+  @Post('message-seen')
+  @UseGuards(AuthGuard)
+  messageSeen(
+    @Body() dto: { chatId: string },
+    @Request() req: AuthenticatedRequest,
+  ) {
+    // The user has seen all the messages of the chatInstance
+    enqueue('messageSeenT1', async () => {
+      await this.dbClient.messageSeen.updateMany({
+        where: { chatId: dto.chatId, userId: req.user.uid },
+        data: { isSeen: true },
+      });
+    });
+
+    this.event.emit('message.seen', dto.chatId, req.user.uid);
+    return {
+      success: true,
+      message: 'all the message has seen in the inbox',
+    };
+  }
+
   @Get(':chatId')
   @UseGuards(AuthGuard)
   async findChatById(
@@ -147,10 +173,15 @@ export class ChatController {
       },
     });
 
+    const messageSeen = await this.dbClient.messageSeen.findMany({
+      where: { chatId: chatId },
+    });
+
     return {
       success: true,
       message: 'chat found',
       chatInstance,
+      messageSeen,
     };
   }
 
@@ -173,11 +204,15 @@ export class ChatController {
         messages: { take: 30, orderBy: { createdAt: 'asc' } }, // Fetch last 10 messages
       },
     });
+    const messageSeen = await this.dbClient.messageSeen.findMany({
+      where: { chatId: { in: userChatIdsMap.get(req.user.uid) } },
+    });
 
     return {
       success: true,
       message: 'chat list retrieved',
       conversations,
+      messageSeen,
     };
   }
   @Delete('cascade')
@@ -193,6 +228,8 @@ export class ChatController {
         type: 'DM',
       },
     });
+    await this.dbClient.messageSeen.deleteMany();
+
     chatMap.clear();
     userChatIdsMap.clear();
     userSocketMap.clear();
